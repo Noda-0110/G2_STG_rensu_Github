@@ -4,6 +4,8 @@
 #include "keyboard.h"	//キーボードの処理
 #include "FPS.h"		//FPSの処理
 
+//マクロ定義
+#define TAMA_DIV_MAX 4	//球の画像の最大数
 
 //構造体の定義
 
@@ -13,10 +15,10 @@ struct IMAGE
 	int handle = -1;	//画像のハンドル（管理番号）
 	char path[255];		//画像の場所（パス）
 
-	int x;		//X位置
-	int y;		//Y位置
-	int width;	//幅
-	int height;	//高さ
+	int x;				//X位置
+	int y;				//Y位置
+	int width;			//幅
+	int height;			//高さ
 
 	BOOL IsDraw = FALSE;//画像が描画できるか
 };
@@ -24,10 +26,10 @@ struct IMAGE
 //キャラクタの構造体
 struct CHARACTOR
 {
-	IMAGE img;	//画像構造体
+	IMAGE img;			//画像構造体
 	int speed = 1;
 
-	RECT coll;	//上下左右当たり判定の領域 RECTは四角形の位置を扱える
+	RECT coll;			//上下左右当たり判定の領域 RECTは四角形の位置を扱える
 };
 
 //動画の構造体
@@ -36,10 +38,10 @@ struct MOVIE
 	int handle = -1;	//動画のハンドル
 	char path[255];		//動画のパス
 
-	int x;		//ｘ位置
-	int y;		//ｙ位置
-	int width;	//幅
-	int height;	//高さ
+	int x;				//ｘ位置
+	int y;				//ｙ位置
+	int width;			//幅
+	int height;			//高さ
 	int Volume = 255;	//ボリューム（最小）0～255（最大）
 };
 
@@ -62,8 +64,8 @@ GAME_SCENE NextGameScene;	//次のゲームのシーン
 
 
 //画面の切り替え
-BOOL IsFadeOut = FALSE;	//フェードアウト
-BOOL IsFadeIn = FALSE;	//フェードイン
+BOOL IsFadeOut = FALSE;		//フェードアウト
+BOOL IsFadeIn = FALSE;		//フェードイン
 
 int FadeTimeMill = 2000;					//切り替えミリ秒
 int FadeTimeMax = FadeTimeMill / 1000 * 60;	//ミリ秒をフレーム病に変換
@@ -76,12 +78,13 @@ int FadeOutCntMax = FadeTimeMax;	//フェードアウトのカウンタMAX
 //フェードイン
 int FadeInCntInit = FadeTimeMax;	//初期値
 int FadeInCnt = FadeInCntInit;		//フェードインのカウンタ
-int FadeInCntMax = FadeTimeMax;				//フェードインのカウンタMAX
+int FadeInCntMax = FadeTimeMax;		//フェードインのカウンタMAX
 
-//PushEnterの点滅
-int PushEnterCnt = 0;
-const int PushEnterCntMAX = 60;
-BOOL PushEnterBrink = FALSE;
+//球の画像のハンドル
+int Tama[TAMA_DIV_MAX];
+int TamaIndex = 0;					//球の添え字
+int TamaChangeCnt = 0;				//画像を変えるタイミング
+int TamaChangeCntMax = 30;			//画像を変えるタイミングMAX
 
 //プロトタイプ宣言
 VOID Title(VOID);		//タイトル画面
@@ -101,21 +104,22 @@ VOID ChangeProc(VOID);	//切り替え画面（処理）
 VOID ChangeDraw(VOID);	//切り替え画面（描画）
 
 
-VOID ChangeScene(GAME_SCENE scene);	//シーン切り替え
+VOID ChangeScene(GAME_SCENE scene);									//シーン切り替え
 
-VOID collUpdateplayer(CHARACTOR* chara);	//当たり判定の領域を更新
+VOID collUpdateplayer(CHARACTOR* chara);							//当たり判定の領域を更新
 
-VOID collUpdateGoal(CHARACTOR* chara);	//当たり判定の領域を更新
+VOID collUpdateGoal(CHARACTOR* chara);								//当たり判定の領域を更新
 
-VOID collUpdateenemy(CHARACTOR* chara);	//当たり判定の領域を更新
+VOID collUpdateenemy(CHARACTOR* chara);								//当たり判定の領域を更新
 
+BOOL colltouch(RECT player, RECT goal);								//当たり判定の触れているか触れていないかの判定
 
-BOOL colltouch(RECT player, RECT goal);//当たり判定の触れているか触れていないかの判定
-
-BOOL GameLoad(VOID);	//ゲームデータの読み込み
+BOOL GameLoad(VOID);														//ゲームデータの読み込み
 BOOL LoadAudio(AUDIO* audio, const char* path, int volume, int playType);	
-BOOL LoadImageMem(IMAGE* image, const char* path);		//音楽の読み込み
-VOID GameInit(VOID);	//ゲームの初期化
+BOOL LoadImageMem(IMAGE* image, const char* path);							//音楽の読み込み
+VOID GameInit(VOID);														//ゲームの初期化
+
+BOOL LoadImageDivMem(int* handle, const char* path, int bunkatuYoko, int bunkatuTate);	//ゲームの画像の分割読み込み
 
 // プログラムは WinMain から始まります
 //Windowsのプログラミング法で動いている
@@ -233,7 +237,8 @@ int WINAPI WinMain(HINSTANCE hInstance,
 
 		ScreenFlip();	//ダブルバッファリングした画面を描画
 	}
-
+	//読み込んだ画像を開放
+	for (int i = 0; i < TAMA_DIV_MAX; i++) { DeleteGraph(Tama[i]); }
 
 	// ＤＸライブラリ使用の終了処理（準備）
 	DxLib_End();
@@ -252,10 +257,70 @@ int WINAPI WinMain(HINSTANCE hInstance,
 /// <returns>読み込めたらTRUE / 読み込めなかったらFALSE</returns>
 BOOL GameLoad()
 {
-	return TRUE;
-
+	//画像を分割して読み込み
+	if (LoadImageDivMem(&Tama[0], ".\\image\\tama2.png", 4, 1) == FALSE) { return FALSE; }
+	return TRUE;	//全てを読み込めた
 }
 // - - - - - データロード - - - - - //
+
+/// <summary>
+/// 画像を分割してメモリに読みこみ
+/// </summary>
+/// <param name="handle">ハンドル配列の先頭アドレス</param>
+/// <param name="path">画像のパス</param>
+/// <param name="bunkatuYoko">分割するときの横の数</param>
+/// <param name="bunkatuTate">分割するときの縦の数</param>
+/// <returns></returns>
+BOOL LoadImageDivMem(int* handle, const char* path, int bunkatuYoko, int bunkatuTate)
+{
+	//球の読み込み
+	int IsTamaLoad = -1;
+
+	//一時的に使うハンドルを用意する（画像サイズの読み込みのため）
+	int Tamahandle = LoadGraph(path);
+
+	if (Tamahandle == -1)
+	{
+		MessageBox(
+			GetMainWindowHandle(),	//ウインドウハンドル
+			path,					//本文
+			"画像読み込みエラー",	//タイトル
+			MB_OK					//ボタン
+		);
+		return FALSE;
+	}
+
+	//画像の幅と高さを取得
+	int TamaWidth = -1;
+	int TamaHeight = -1;
+	GetGraphSize(Tamahandle, &TamaWidth, &TamaHeight);
+
+	//分割して読み込み
+	IsTamaLoad = LoadDivGraph(
+		path,						//画像のパス
+		TAMA_DIV_MAX,					//分割総数
+		bunkatuYoko, bunkatuTate,							//横の分割、縦の分割
+		TamaWidth / bunkatuYoko, TamaHeight / bunkatuTate,	//画像一つ分の幅、高さ
+		handle						//連続する先頭アドレス
+	);
+
+	//分割エラー
+	if (Tamahandle == -1)
+	{
+		MessageBox(
+			GetMainWindowHandle(),	//ウインドウハンドル
+			path,				//本文
+			"画像分割エラー",	//タイトル
+			MB_OK
+		);
+		return FALSE;
+	}
+
+	//一時的に読み込んだハンドルを開放する
+	DeleteGraph(Tamahandle);
+
+	return TRUE;
+}
 
 VOID GameInit(VOID)
 {
@@ -333,7 +398,28 @@ VOID TitleProc(VOID)
 /// </summary>
 VOID TitleDraw(VOID)
 {
-	DrawString(0, 0, "タイトル画面", GetColor(0, 0, 0));
+	//球の描画
+	DrawGraph(0, 0, Tama[TamaIndex], TRUE);
+	
+	//画像を変えるタイミング
+	if (TamaChangeCnt < TamaChangeCntMax)
+	{
+		TamaChangeCnt++;
+	}
+	else
+	{
+		//球の添え字が球の分割数の最大よりも少ない
+		if (TamaIndex < TAMA_DIV_MAX - 1)
+		{
+			TamaIndex++;		//次の画像へ
+		}
+		else
+		{
+			TamaIndex = 0;		//最初に戻す
+		}
+		TamaChangeCnt = 0;
+	}
+	DrawString(0, 0, "タイトル画面", GetColor(255, 0, 0));
 	return;
 }
 
