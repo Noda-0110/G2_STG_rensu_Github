@@ -6,6 +6,7 @@
 
 //マクロ定義
 #define TAMA_DIV_MAX 4	//球の画像の最大数
+#define TAMA_MAX 10	//球の画像の最大数
 
 //構造体の定義
 
@@ -55,6 +56,30 @@ struct AUDIO
 	int playType = -1;
 };
 
+//球の構造体
+struct TAMA
+{
+	int handle[TAMA_DIV_MAX];	//画像のハンドル
+	char path[255];	//画像のパス
+
+	int DivTate;	//分割数（縦）
+	int DivYoko;	//分割数（横）
+	int DivMax;		//分割総数
+
+	int AnimeCnt = 0;		//アニメーションカウンタ
+	int AnimeCntMAX = 0;	//アニメーションカウンタマックス
+
+	int NonIndex = 0;		//現在の画像の要素数
+
+	int x;			//xの位置
+	int y;			//yの位置
+	int width;		//幅
+	int height;		//高さ
+	int spped;		//球の速さ
+
+	RECT coll;				//当たり判定（矩形）
+	BOOL IsDraw = FALSE;	//描画できるか
+};
 
 //グローバル変数
 //シーンを管理する変数
@@ -80,11 +105,9 @@ int FadeInCntInit = FadeTimeMax;	//初期値
 int FadeInCnt = FadeInCntInit;		//フェードインのカウンタ
 int FadeInCntMax = FadeTimeMax;		//フェードインのカウンタMAX
 
-//球の画像のハンドル
-int Tama[TAMA_DIV_MAX];
-int TamaIndex = 0;					//球の添え字
-int TamaChangeCnt = 0;				//画像を変えるタイミング
-int TamaChangeCntMax = 30;			//画像を変えるタイミングMAX
+//球の構造体変数
+struct TAMA tama_moto;				//元
+struct TAMA tama[TAMA_MAX];				//実際に使う
 
 //プロトタイプ宣言
 VOID Title(VOID);		//タイトル画面
@@ -104,20 +127,22 @@ VOID ChangeProc(VOID);	//切り替え画面（処理）
 VOID ChangeDraw(VOID);	//切り替え画面（描画）
 
 
-VOID ChangeScene(GAME_SCENE scene);									//シーン切り替え
+VOID ChangeScene(GAME_SCENE scene);						//シーン切り替え
 
-VOID collUpdateplayer(CHARACTOR* chara);							//当たり判定の領域を更新
+VOID collUpdateplayer(CHARACTOR* chara);				//当たり判定の領域を更新
 
-VOID collUpdateGoal(CHARACTOR* chara);								//当たり判定の領域を更新
+VOID collUpdateTama(TAMA* tama);						//当たり判定の領域を更新
 
-VOID collUpdateenemy(CHARACTOR* chara);								//当たり判定の領域を更新
+VOID collUpdateenemy(CHARACTOR* chara);					//当たり判定の領域を更新
 
-BOOL colltouch(RECT player, RECT goal);								//当たり判定の触れているか触れていないかの判定
 
-BOOL GameLoad(VOID);														//ゲームデータの読み込み
+BOOL colltouch(RECT player, RECT goal);					//当たり判定の触れているか触れていないかの判定
+BOOL GameLoad(VOID);									//ゲームデータの読み込み
 BOOL LoadAudio(AUDIO* audio, const char* path, int volume, int playType);	
-BOOL LoadImageMem(IMAGE* image, const char* path);							//音楽の読み込み
-VOID GameInit(VOID);														//ゲームの初期化
+BOOL LoadImageMem(IMAGE* image, const char* path);					//音楽の読み込み
+VOID GameInit(VOID);												//ゲームの初期化
+
+VOID DrawTama(TAMA* tama);											//球の描画
 
 BOOL LoadImageDivMem(int* handle, const char* path, int bunkatuYoko, int bunkatuTate);	//ゲームの画像の分割読み込み
 
@@ -238,7 +263,7 @@ int WINAPI WinMain(HINSTANCE hInstance,
 		ScreenFlip();	//ダブルバッファリングした画面を描画
 	}
 	//読み込んだ画像を開放
-	for (int i = 0; i < TAMA_DIV_MAX; i++) { DeleteGraph(Tama[i]); }
+	for (int i = 0; i < TAMA_DIV_MAX; i++) { DeleteGraph(tama_moto.handle[i]); }
 
 	// ＤＸライブラリ使用の終了処理（準備）
 	DxLib_End();
@@ -257,8 +282,33 @@ int WINAPI WinMain(HINSTANCE hInstance,
 /// <returns>読み込めたらTRUE / 読み込めなかったらFALSE</returns>
 BOOL GameLoad()
 {
+	//球の分割数を設定
+	tama_moto.x = 4;
+	tama_moto.y = 1;
+
+	//球のパス
+	strcpyDx(tama_moto.path,".\\image\\dia_green.png");
+
 	//画像を分割して読み込み
-	if (LoadImageDivMem(&Tama[0], ".\\image\\tama2.png", 4, 1) == FALSE) { return FALSE; }
+	if (LoadImageDivMem(&tama_moto.handle[0], ".\\image\\dia_green.png", 4, 1) == FALSE) { return FALSE; }
+
+	//位置を設定
+	tama_moto.x = GAME_WIDTH / 2 - tama_moto.width / 2;		//中央ぞろえ
+	tama_moto.y = GAME_HEIGHT - tama_moto.height;			//画面↓
+
+	tama_moto.spped = 10;		//速度
+	//当たり判定の更新
+	collUpdateTama(&tama_moto);
+
+	//全ての球の情報をコピー
+	for (int i = 0; i < TAMA_MAX; i++)
+	{
+		tama[i] = tama_moto;
+	}
+
+	//画像の表示
+	tama_moto.IsDraw = FALSE;
+
 	return TRUE;	//全てを読み込めた
 }
 // - - - - - データロード - - - - - //
@@ -398,31 +448,39 @@ VOID TitleProc(VOID)
 /// </summary>
 VOID TitleDraw(VOID)
 {
-	//球の描画
-	DrawGraph(0, 0, Tama[TamaIndex], TRUE);
-	
-	//画像を変えるタイミング
-	if (TamaChangeCnt < TamaChangeCntMax)
-	{
-		TamaChangeCnt++;
-	}
-	else
-	{
-		//球の添え字が球の分割数の最大よりも少ない
-		if (TamaIndex < TAMA_DIV_MAX - 1)
-		{
-			TamaIndex++;		//次の画像へ
-		}
-		else
-		{
-			TamaIndex = 0;		//最初に戻す
-		}
-		TamaChangeCnt = 0;
-	}
+	DrawTama(&tama[0]);
 	DrawString(0, 0, "タイトル画面", GetColor(255, 0, 0));
 	return;
 }
 
+/// <summary>
+/// 球の描画
+/// </summary>
+/// <param name="tama">球の構造体</param>
+VOID DrawTama(TAMA* tama)
+{
+	//球の描画
+	DrawGraph(0, 0, tama->handle[tama->NonIndex], TRUE);
+
+	//画像を変えるタイミング
+	if (tama->AnimeCnt < tama->AnimeCntMAX)
+	{
+		tama->AnimeCnt++;
+	}
+	else
+	{
+		//球の添え字が球の分割数の最大よりも少ない
+		if (tama->NonIndex < TAMA_DIV_MAX - 1)
+		{
+			tama->NonIndex++;		//次の画像へ
+		}
+		else
+		{
+			tama->NonIndex = 0;		//最初に戻す
+		}
+		tama->AnimeCnt = 0;
+	}
+}
 
 /// <summary>
 /// プレイ画面
@@ -611,12 +669,12 @@ VOID collUpdateplayer(CHARACTOR* chara)
 /// 当たり判定の更新(ゴール用)
 /// </summary>
 /// <param name="coll">当たり判定の領域</param>
-VOID collUpdateGoal(CHARACTOR* chara)
+VOID collUpdateTama(TAMA* tama)
 {
-	chara->coll.left = chara->img.x;
-	chara->coll.top = chara->img.y;
-	chara->coll.right = chara->img.x + chara->img.width;
-	chara->coll.bottom = chara->img.y + chara->img.height;
+	tama->coll.left = tama->x;
+	tama->coll.top = tama->y;
+	tama->coll.right = tama->x + tama->width;
+	tama->coll.bottom = tama->y + tama->height;
 
 	return;
 }
