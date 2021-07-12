@@ -8,7 +8,9 @@
 
 //マクロ定義
 #define TAMA_DIV_MAX 4	//球の画像の最大数
-#define TAMA_MAX 13	//球の画像の最大数
+#define TAMA_MAX 100	//球の画像の最大数
+#define TEKI_KIND 8		//敵の画像の種類
+#define TEKI_MAX 10		//敵の画像の総数
 
 //構造体の定義
 
@@ -30,8 +32,7 @@ struct IMAGE
 struct CHARACTOR
 {
 	IMAGE img;			//画像構造体
-	int speed = 1;
-
+	int speed = 1;		//移動速度
 	RECT coll;			//上下左右当たり判定の領域 RECTは四角形の位置を扱える
 };
 
@@ -71,11 +72,10 @@ struct TAMA
 	int AnimeCnt = 0;		//アニメーションカウンタ
 	int AnimeCntMAX = 0;	//アニメーションカウンタマックス
 
-	int NonIndex = 0;		//現在の画像の要素数
+	int NowIndex = 0;		//現在の画像の要素数
 
 	int Startx;		//X最初位置
 	int Starty;		//Y最初位置
-
 
 	float radius;	//半径
 	float degree;	//角度
@@ -118,10 +118,32 @@ int FadeInCntMax = FadeTimeMax;		//フェードインのカウンタMAX
 struct TAMA tama_moto;				//元
 struct TAMA tama[TAMA_MAX];			//実際に使う
 
+//球の発射カウント
 int tamashotcnt = 0;
 int tamashotcntMAX = 5;
 
+//プレイヤー構造体宣言
 CHARACTOR player;
+
+//背景画像(シームレスだから２つ)
+IMAGE back[2];
+
+//敵データ(弾と同じく元となるもの)
+CHARACTOR teki_moto[TEKI_KIND];
+//実敵データ
+CHARACTOR teki[TEKI_MAX];
+
+char tekiPath[TEKI_KIND][255] =
+{
+	{".\\\\"},
+	{".\\\\"},
+	{".\\\\"},
+	{".\\\\"},
+	{".\\\\"},
+	{".\\\\"},
+	{".\\\\"},
+	{".\\\\"},
+};
 
 //プロトタイプ宣言
 VOID Title(VOID);		//タイトル画面
@@ -144,13 +166,11 @@ VOID ChangeDraw(VOID);	//切り替え画面（描画）
 VOID ChangeScene(GAME_SCENE scene);						//シーン切り替え
 
 VOID collUpdateplayer(CHARACTOR* chara);				//当たり判定の領域を更新
-
 VOID collUpdateTama(TAMA* tama);						//当たり判定の領域を更新
-
 VOID collUpdateenemy(CHARACTOR* chara);					//当たり判定の領域を更新
 
 
-BOOL colltouch(RECT player, RECT goal);					//当たり判定の触れているか触れていないかの判定
+BOOL colltouch(RECT a, RECT b);					//当たり判定の触れているか触れていないかの判定
 BOOL GameLoad(VOID);									//ゲームデータの読み込み
 BOOL LoadAudio(AUDIO* audio, const char* path, int volume, int playType);	//音楽の読み込み
 BOOL LoadImageMem(IMAGE* image, const char* path);
@@ -225,7 +245,6 @@ int WINAPI WinMain(HINSTANCE hInstance,
 		//キーボードの入力更新
 		AllKeyUpdate();
 
-
 		//FPS値の更新
 		FPSUpdate();
 
@@ -282,6 +301,12 @@ int WINAPI WinMain(HINSTANCE hInstance,
 	//読み込んだ画像を開放
 	for (int i = 0; i < TAMA_DIV_MAX; i++) { DeleteGraph(tama_moto.handle[i]); }
 
+	//プレイヤーを開放
+	DeleteGraph(player.img.handle);
+
+	//背景画像を開放
+	DeleteGraph(back[0].handle);
+	DeleteGraph(back[1].handle);
 	// ＤＸライブラリ使用の終了処理（準備）
 	DxLib_End();
 
@@ -291,10 +316,10 @@ int WINAPI WinMain(HINSTANCE hInstance,
 
 
 
-// - - - - データロード - - - - //
+// - - - -  - - - - データロード - - - -  - - - - //
 
 /// <summary>
-/// ゲームのデータを読み込み
+/// ゲームのデータを読み込む
 /// </summary>
 /// <returns>読み込めたらTRUE / 読み込めなかったらFALSE</returns>
 BOOL GameLoad()
@@ -303,7 +328,7 @@ BOOL GameLoad()
 	tama_moto.DivYoko = 4;
 	tama_moto.DivTate = 1;
 
-	//球のパス
+	//球のパスをコピー
 	strcpyDx(tama_moto.path,".\\image\\dia_green.png");
 
 	//画像を分割して読み込み
@@ -334,13 +359,33 @@ BOOL GameLoad()
 		tama[i] = tama_moto;
 	}
 
+	//プレイヤーの読み込み
 	if (LoadImageMem(&player.img, ".\\image\\player.png") == FALSE) { return FALSE; }
 	player.img.x = GAME_WIDTH / 2 - player.img.width;
 	player.img.y = GAME_HEIGHT / 2 - player.img.height;
 	collUpdateplayer(&player);
 	player.img.IsDraw == TRUE;
 
+	//背景の読み込み
+	if (LoadImageMem(&back[0], ".\\image\\hosi.png") == FALSE) { return FALSE; }
+	player.img.x = 0;				//画像の左端
+	player.img.y = -back[0].height;	//画像の高さ分、位置を上に（ー方向）挙げる
+	player.img.IsDraw == TRUE;
 
+	if (LoadImageMem(&back[1], ".\\image\\hosi_rev.png") == FALSE) { return FALSE; }
+	player.img.x = 0;				//画像の左端
+	player.img.y = 0;	//画像の高さ分、位置を上に（ー方向）挙げる
+	player.img.IsDraw == TRUE;
+
+	//敵の読み込み
+	for (int i = 0; i < TEKI_KIND; i++)
+	{
+		if (LoadImageMem(&teki_moto[0].img, tekiPath[i]) == FALSE) { return FALSE; }
+		teki_moto[i].img.x = GAME_WIDTH / 2 - teki_moto[i].img.width;
+		teki_moto[i].img.y = -teki_moto[i].img.height;
+		collUpdateplayer(&teki_moto[i]);
+		teki_moto[i].img.IsDraw == TRUE;
+	}
 	return TRUE;	//全てを読み込めた
 }
 // - - - - - データロード - - - - - //
@@ -412,6 +457,16 @@ VOID GameInit(VOID)
 	player.img.y = GAME_HEIGHT / 2 - player.img.height;
 	collUpdateplayer(&player);
 	player.img.IsDraw = TRUE;
+
+	//背景画像の設定1
+	back[0].x = 0;
+	back[0].y = -back[0].height;
+	back[0].IsDraw = TRUE;
+
+	//背景画像の設定1
+	back[1].x = 0;
+	back[1].y = 0;
+	back[1].IsDraw = TRUE;
 
 }
 
@@ -501,7 +556,7 @@ VOID DrawTama(TAMA* tama)
 	if (tama->IsDraw == TRUE)
 	{
 		//球の描画
-		DrawGraph(tama->x, tama->y, tama->handle[tama->NonIndex], TRUE);
+		DrawGraph(tama->x, tama->y, tama->handle[tama->NowIndex], TRUE);
 
 		//画像を変えるタイミング
 		if (tama->AnimeCnt < tama->AnimeCntMAX)
@@ -511,13 +566,13 @@ VOID DrawTama(TAMA* tama)
 		else
 		{
 			//球の添え字が球の分割数の最大よりも少ない
-			if (tama->NonIndex < TAMA_DIV_MAX - 1)
+			if (tama->NowIndex < TAMA_DIV_MAX - 1)
 			{
-				tama->NonIndex++;		//次の画像へ
+				tama->NowIndex++;		//次の画像へ
 			}
 			else
 			{
-				tama->NonIndex = 0;		//最初に戻す
+				tama->NowIndex = 0;		//最初に戻す
 			}
 			tama->AnimeCnt = 0;
 		}
@@ -586,42 +641,45 @@ VOID PlayProc(VOID)
 	{
 		if (tamashotcnt == 0)
 		{
-				//球を発射する（描画する）
-				for (int i = 0; i < TAMA_MAX; i++)
+			//弾を発射する(弾を描画する) 
+			for (int i = 0; i < TAMA_MAX; i++)
+			{
+				if (tama[i].IsDraw == FALSE)
 				{
-					if (tama[i].IsDraw == FALSE)
-					{
-						shottama(&tama[i], 240);
-						//球を一発出したらループを抜ける
-						break;
-					}
+					shottama(&tama[i], 240);
 
+					//弾を出したら、ループを抜ける
+					break;
 				}
-				for (int i = 0; i < TAMA_MAX; i++)
+			}
+
+			//弾を発射(弾の描画) 
+			for (int i = 0; i < TAMA_MAX; i++)
+			{
+				if (tama[i].IsDraw == FALSE)
 				{
-					if (tama[i].IsDraw == FALSE)
-					{
-						shottama(&tama[i], 270);
-						//球を一発出したらループを抜ける
-						break;
-					}
+					shottama(&tama[i], 270);
 
+					//弾を１発出したら、ループを抜ける
+					break;
 				}
-				for (int i = 0; i < TAMA_MAX; i++)
+			}
+
+			//弾を発射(弾の描画) 
+			for (int i = 0; i < TAMA_MAX; i++)
+			{
+				if (tama[i].IsDraw == FALSE)
 				{
-					if (tama[i].IsDraw == FALSE)
-					{
-						shottama(&tama[i], 300);
-						//球を一発出したらループを抜ける
-						break;
-					}
+					shottama(&tama[i], 300);
 
+					//弾を出したら、ループを抜ける
+					break;
 				}
-			
+			}
+
 		}
 
-
-		//球の発射待ち
+		//弾の発射待ち
 		if (tamashotcnt < tamashotcntMAX)
 		{
 			tamashotcnt++;
@@ -631,33 +689,38 @@ VOID PlayProc(VOID)
 			tamashotcnt = 0;
 		}
 	}
-	//球を飛ばす
-		//球を発射する（描画する）
-		for (int i = 0; i < TAMA_MAX; i++)
+
+
+	for (int i = 0; i < TAMA_MAX; i++)
+	{
+		//描画されているとき
+		if (tama[i].IsDraw == TRUE)
 		{
-			if (tama[i].IsDraw == TRUE)
+			//弾の位置
+			//　中心位置　＋　飛ばす角度→飛ばす距離を計算　＊　距離
+			tama[i].x = tama[i].Startx + cos(tama[i].degree * DX_PI / 180.0f) * tama[i].radius;
+			tama[i].y = tama[i].Starty + sin(tama[i].degree * DX_PI / 180.0f) * tama[i].radius;
+
+			//半径を足す
+			tama[i].radius += tama[i].spped;
+
+
+			//球の当たり判定を更新
+			collUpdateTama(&tama[i]);
+
+			//画面外に出たら、描画しない
+			if (tama[i].y + tama[i].height < 0 ||	//画面外（上）
+				tama[i].y > GAME_HEIGHT ||			//画面外（下）
+				tama[i].x + tama[i].width < 0 ||	//画面外（左）
+				tama[i].x > GAME_WIDTH)				//画面外（右）
 			{
-				
-				tama[i].x = tama[i].Startx + cos(tama[i].degree * DX_PI /180.0f) * tama[i].radius;
-				tama[i].y = tama[i].Starty + sin(tama[i].degree * DX_PI /180.0f) * tama[i].radius;
-
-
-				//半径を足す
-				tama[i].radius += tama[i].spped;
-
-				//画面外に出たら描画を止める
-				if (tama[i].y + tama[i].height < 0 ||//画面外（上）
-					tama[i].y > GAME_HEIGHT ||			//画面外（下）
-					tama[i].x + tama[i].width < 0 ||	//画面外 (左)
-					tama[i].x > GAME_WIDTH)				//画面外 (右)
-				{
-					tama[i].IsDraw == FALSE;
-				}
+				tama[i].IsDraw = FALSE;
 			}
 		}
-	
+	}
+
 	return;
-} 
+}
 
 /// <summary>
 /// 球を飛ばす
@@ -692,7 +755,19 @@ VOID shottama(TAMA* tama,float deg)
 /// </summary>
 VOID PlayDraw(VOID)
 {
+	//背景の描画
+	for (int i = 0; i < 2; i++)
+	{
+		//背景の描画
+		DrawGraph(back[i].x, back[i].y, back[i].handle, TRUE);
 
+		//画像が下まで進んだ時
+		if (back[i].y > GAME_HEIGHT)
+		{
+			back[i].y = -back[i].height + 1;
+		}
+		back[i].y += 5 ;
+	}
 	//プレイヤーの描画
 	if (player.img.IsDraw == TRUE)
 	{
@@ -879,6 +954,7 @@ VOID collUpdateTama(TAMA* tama)
 {
 	tama->coll.left = tama->x;
 	tama->coll.top = tama->y;
+
 	tama->coll.right = tama->x + tama->width;
 	tama->coll.bottom = tama->y + tama->height;
 
@@ -899,14 +975,19 @@ VOID collUpdateenemy(CHARACTOR* chara)
 	return;
 }
 
-
-BOOL colltouch(RECT p,RECT g)
+/// <summary>
+/// 矩形同士の当たり判定
+/// </summary>
+/// <param name="a">何らかの矩形"a"</param>
+/// <param name="b">何らかの矩形"b"</param>
+/// <returns>当たったらTRUE / 当たらなければFALSE</returns>
+BOOL colltouch(RECT a,RECT b)
 {
 	if (
-		p.left < g.right &&	//pの左辺x < gの右辺x座標
-		p.right > g.left &&	//pの右辺x < gの左辺x座標
-		p.bottom > g.top &&	//pの上辺y < gの下辺y座標
-		p.top < g.bottom	//pの下辺y < gの上辺y座標
+		a.left < b.right &&	//pの左辺x < gの右辺x座標
+		a.right > b.left &&	//pの右辺x < gの左辺x座標
+		a.bottom > b.top &&	//pの上辺y < gの下辺y座標
+		a.top < b.bottom	//pの下辺y < gの上辺y座標
 		)
 	{
 		return TRUE;
