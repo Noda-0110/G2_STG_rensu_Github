@@ -223,7 +223,6 @@ int WINAPI WinMain(HINSTANCE hInstance,
 	SetWindowStyleMode(GAME_WINDOW_BAR);	//ウィンドウバーの状態
 	SetWaitVSyncFlag(TRUE);					//ディスプレイの垂直同期を有効にする
 											//高度な処理や描画を行う時にはFALSE
-
 	SetAlwaysRunFlag(TRUE);					//ウィンドウをずっとアクティブにする
 
 
@@ -412,8 +411,8 @@ BOOL GameLoad()
 		if (LoadImageMem(&teki_moto[i].img, tekiPath[i]) == FALSE) { return FALSE; }
 		teki_moto[i].img.x = GAME_WIDTH / 2 - teki_moto[i].img.width;
 		teki_moto[i].img.y = -teki_moto[i].img.height;
-		collUpdateplayer(&teki_moto[i]);
-		teki_moto[i].img.IsDraw == TRUE;
+		collUpdateplayer(&teki_moto[i]);	//当たり判定の更新
+		teki_moto[i].img.IsDraw == FALSE;	//描画しません
 	}
 	return TRUE;	//全てを読み込めた
 }
@@ -510,8 +509,8 @@ VOID GameInit(VOID)
 	{
 		teki_moto[i].img.x = GAME_WIDTH / 2 - teki_moto[i].img.width;
 		teki_moto[i].img.y = teki_moto[i].img.height;
-		collUpdateplayer(&teki_moto[i]);
-		teki_moto[i].img.IsDraw = FALSE;
+		collUpdateplayer(&teki_moto[i]);	//当たり判定の更新
+		teki_moto[i].img.IsDraw = FALSE;	//描画はしない
 	}
 
 }
@@ -691,8 +690,8 @@ VOID PlayProc(VOID)
 	*/
 
 	//マウスの位置にプレイヤーを置く
-	player.img.x = mouse.Point.x - player.img.width / 2;
-	player.img.y = mouse.Point.y - player.img.height / 2;
+	player.img.x = mouse.Point.x - player.img.width / 2;	//マウスの位置を画像の中心にする
+	player.img.y = mouse.Point.y - player.img.height / 2;	//マウスの位置を画像の中心にする
 
 	collUpdateplayer(&player);
 	/*
@@ -818,6 +817,7 @@ VOID PlayProc(VOID)
 
 	else {
 		tekiAddcnt = 0;
+
 		//敵の描画（生成）
 		for (int i = 0; i < TEKI_MAX; i++)
 		{
@@ -834,7 +834,7 @@ VOID PlayProc(VOID)
 				{
 					teki[i] = teki_moto[1];
 				}
-				else
+				else if(score < 5000)
 				{
 					teki[i] = teki_moto[GetRand(TEKI_KIND - 1)];
 				}
@@ -929,7 +929,7 @@ VOID PlayDraw(VOID)
 			back[i].y = -back[i].height + 1;
 
 		}
-		back[i].y += 5 ;
+		back[i].y++ ;
 	}
 
 	//敵の描画
@@ -953,13 +953,14 @@ VOID PlayDraw(VOID)
 		if (teki[i].img.IsDraw == TRUE)
 		{
 			DrawGraph(teki[i].img.x, teki[i].img.y, teki[i].img.handle, TRUE);
-		}
 
-		if (GAME_DEBUG == TRUE)
-		{
-			DrawBox(
-				teki[i].coll.left, teki[i].coll.top, teki[i].coll.right, teki[i].coll.bottom,
-				GetColor(0, 0, 255), FALSE);
+
+			if (GAME_DEBUG == TRUE)
+			{
+				DrawBox(
+					teki[i].coll.left, teki[i].coll.top, teki[i].coll.right, teki[i].coll.bottom,
+					GetColor(0, 0, 255), FALSE);
+			}
 		}
 	}
 
@@ -994,7 +995,7 @@ VOID PlayDraw(VOID)
 	int old = GetFontSize();//以前のフォントのサイズを取得しておく
 	SetFontSize(40);		//フォントを大きくする
 
-	DrawFormatString(0, 100, GetColor(0, 255, 0), "SCORE:%05d", score);
+	DrawFormatString(0, 50, GetColor(0, 255, 0), "SCORE:%05d", score);
 
 	SetFontSize(old);		//フォントを元に戻す
 
