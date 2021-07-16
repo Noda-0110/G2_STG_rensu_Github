@@ -357,10 +357,10 @@ BOOL GameLoad()
 	tama_moto.DivTate = 1;
 
 	//球のパスをコピー
-	strcpyDx(tama_moto.path,".\\image\\dia_green.png");
+	strcpyDx(tama_moto.path, ".\\image\\dia_green.png");
 
 	//画像を分割して読み込み
-	if (LoadImageDivMem(&tama_moto.handle[0], ".\\image\\dia_green.png",tama_moto.DivYoko,tama_moto.DivTate) == FALSE) { return FALSE; }
+	if (LoadImageDivMem(&tama_moto.handle[0], ".\\image\\dia_green.png", tama_moto.DivYoko, tama_moto.DivTate) == FALSE) { return FALSE; }
 
 	//幅と高さを所得
 	GetGraphSize(tama_moto.handle[0], &tama_moto.width, &tama_moto.height);
@@ -525,7 +525,7 @@ VOID GameInit(VOID)
 /// <returns></returns>
 BOOL LoadAudio(AUDIO* audio, const char* path, int volume, int playType)
 {
-	strcpyDx(audio->path,path);
+	strcpyDx(audio->path, path);
 	audio->handle = LoadSoundMem(audio->path);
 
 	//音楽を読み込みができなかった
@@ -669,7 +669,6 @@ VOID PlayProc(VOID)
 		{
 			player.img.x += player.speed;
 		}
-
 	}
 	//プレイヤーを操作
 		if (KeyDown(KEY_INPUT_UP) == TRUE)
@@ -698,7 +697,7 @@ VOID PlayProc(VOID)
 	//スペースキーを押しているとき
 	if (KeyDown(KEY_INPUT_SPACE) == TRUE)
 	*/
-	if(MouseDown(MOUSE_INPUT_LEFT) == TRUE)
+	if (MouseDown(MOUSE_INPUT_LEFT) == TRUE)
 	{
 		if (tamashotcnt == 0)
 		{
@@ -834,7 +833,7 @@ VOID PlayProc(VOID)
 				{
 					teki[i] = teki_moto[1];
 				}
-				else if(score < 5000)
+				else if (score < 5000)
 				{
 					teki[i] = teki_moto[GetRand(TEKI_KIND - 1)];
 				}
@@ -848,39 +847,39 @@ VOID PlayProc(VOID)
 		}
 	}
 
-		//敵の処理
-		for (int i = 0; i < TEKI_MAX; i++)
+	//敵の処理
+	for (int i = 0; i < TEKI_MAX; i++)
+	{
+		if (teki[i].img.IsDraw == TRUE)
 		{
-			if (teki[i].img.IsDraw == TRUE)
+			teki[i].img.y += 1;	//下へ移動
+
+			collUpdateenemy(&teki[i]);
+
+			//敵が下まで言ったとき表示を止める
+			if (teki[i].img.y > GAME_HEIGHT)
 			{
-				teki[i].img.y += 1;	//下へ移動
+				teki[i].img.IsDraw = FALSE;
+			}
 
-				collUpdateenemy(&teki[i]);
-
-				//敵が下まで言ったとき表示を止める
-				if (teki[i].img.y > GAME_HEIGHT)
+			//敵に弾が当たった時、敵は表示を止める
+			for (int cnt = 0; cnt < TAMA_MAX; cnt++)
+			{
+				//描画されているとき
+				if (tama[cnt].IsDraw == TRUE)
 				{
-					teki[i].img.IsDraw = FALSE;
-				}
-
-				//敵に弾が当たった時、敵は表示を止める
-				for (int cnt = 0; cnt < TAMA_MAX; cnt++)
-				{
-					//描画されているとき
-					if (tama[cnt].IsDraw == TRUE)
+					if (colltouch(teki[i].coll, tama[cnt].coll) == TRUE)
 					{
-						if (colltouch(teki[i].coll, tama[cnt].coll) == TRUE)
-						{
-							tama[cnt].IsDraw = FALSE;		//弾の描画を止める
-							teki[i].img.IsDraw = FALSE;	//敵の描画を止める
+						tama[cnt].IsDraw = FALSE;		//弾の描画を止める
+						teki[i].img.IsDraw = FALSE;	//敵の描画を止める
 
-							score += 100;				//スコアを加算する
-						}
+						score += 100;				//スコアを加算する
 					}
 				}
 			}
 		}
-	
+	}
+
 	return;
 }
 
@@ -888,27 +887,27 @@ VOID PlayProc(VOID)
 /// 球を飛ばす
 /// </summary>
 /// <param name="tama"></param>
-VOID shottama(TAMA* tama,float deg)
+VOID shottama(TAMA* tama, float deg)
 {
-		//球を発射(描画)
-		tama->IsDraw = TRUE;
+	//球を発射(描画)
+	tama->IsDraw = TRUE;
 
-		//球の発射（描画)位置
-		tama->Startx = player.img.x + player.img.width / 2 - tama->width / 2;
-		tama->Starty = player.img.y;
+	//球の発射（描画)位置
+	tama->Startx = player.img.x + player.img.width / 2 - tama->width / 2;
+	tama->Starty = player.img.y;
 
 
-		//球の速度を変える
-		tama->spped = 6;
+	//球の速度を変える
+	tama->spped = 6;
 
-		//球の角度
-		tama->degree = deg;
+	//球の角度
+	tama->degree = deg;
 
-		//球の半径
-		tama->radius = 0.0f;
+	//球の半径
+	tama->radius = 0.0f;
 
-		//当たり判定を更新
-		collUpdateTama(tama);
+	//当たり判定を更新
+	collUpdateTama(tama);
 }
 
 
@@ -929,7 +928,7 @@ VOID PlayDraw(VOID)
 			back[i].y = -back[i].height + 1;
 
 		}
-		back[i].y++ ;
+		back[i].y++;
 	}
 
 	//敵の描画
@@ -940,7 +939,6 @@ VOID PlayDraw(VOID)
 		{
 			DrawGraph(teki[i].img.x, teki[i].img.y, teki[i].img.handle, TRUE);
 		}
-
 		if (GAME_DEBUG == TRUE)
 		{
 			DrawBox(
@@ -986,7 +984,7 @@ VOID PlayDraw(VOID)
 			if (GAME_DEBUG == TRUE)
 			{
 				DrawBox(tama[i].coll.left, tama[i].coll.top, tama[i].coll.right, tama[i].coll.bottom,
-				GetColor(255, 0, 0), FALSE);
+					GetColor(255, 0, 0), FALSE);
 			}
 		}
 	}
@@ -1186,12 +1184,12 @@ VOID collUpdateenemy(CHARACTOR* chara)
 
 VOID collUpdate(CHARACTOR* chara)
 {
-		chara->coll.left = chara->img.x;
-		chara->coll.top = chara->img.y;
-		chara->coll.right = chara->img.x + chara->img.width;
-		chara->coll.bottom = chara->img.y + chara->img.height;
+	chara->coll.left = chara->img.x;
+	chara->coll.top = chara->img.y;
+	chara->coll.right = chara->img.x + chara->img.width;
+	chara->coll.bottom = chara->img.y + chara->img.height;
 
-		return;
+	return;
 }
 
 /// <summary>
@@ -1200,7 +1198,7 @@ VOID collUpdate(CHARACTOR* chara)
 /// <param name="a">何らかの矩形"a"</param>
 /// <param name="b">何らかの矩形"b"</param>
 /// <returns>当たったらTRUE / 当たらなければFALSE</returns>
-BOOL colltouch(RECT a,RECT b)
+BOOL colltouch(RECT a, RECT b)
 {
 	if (
 		a.left < b.right &&	//pの左辺x < gの右辺x座標
