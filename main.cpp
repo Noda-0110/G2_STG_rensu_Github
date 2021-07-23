@@ -117,6 +117,11 @@ int FadeInCntInit = FadeTimeMax;	//初期値
 int FadeInCnt = FadeInCntInit;		//フェードインのカウンタ
 int FadeInCntMax = FadeTimeMax;		//フェードインのカウンタMAX
 
+//PushEnter
+int PushEnterCnt = 0;
+const int PushEnterCntMAX = 60;
+BOOL PushEnterBrink = FALSE;
+
 //球の構造体変数
 struct TAMA tama_moto;				//元
 struct TAMA tama[TAMA_MAX];			//実際に使う
@@ -134,11 +139,25 @@ CHARACTOR player;
 //背景画像(シームレスだから２つ)
 IMAGE back[2];
 
+//背景画像（タイトルとエンド）
+MOVIE titleMovie;
+IMAGE finish[1];
+
 //敵データ(弾と同じく元となるもの)
 CHARACTOR teki_moto[TEKI_KIND];
 
 //実敵データ
 CHARACTOR teki[TEKI_MAX];
+
+//ロゴの読み込み
+IMAGE TitleLogo;
+IMAGE EndLogo;
+IMAGE PlayEnter;
+
+//BGMの読み込み
+AUDIO TitleBGM;
+AUDIO PlayBGM;
+AUDIO EndBGM;
 
 //敵のパスを入れておく
 char tekiPath[TEKI_KIND][255] =
@@ -323,11 +342,17 @@ int WINAPI WinMain(HINSTANCE hInstance,
 
 	//プレイヤーを開放
 	DeleteGraph(player.img.handle);
+	DeleteGraph(titleMovie.handle);
 
 	//背景画像を開放
 	DeleteGraph(back[0].handle);
 	DeleteGraph(back[1].handle);
+	DeleteGraph(finish[0].handle);
 
+	//音楽を削除
+	DeleteSoundMem(TitleBGM.handle);
+	DeleteSoundMem(PlayBGM.handle);
+	DeleteSoundMem(EndBGM.handle);
 
 	//敵の画像を開放
 	for (int i = 0; i < TEKI_KIND; i++)
@@ -352,6 +377,23 @@ int WINAPI WinMain(HINSTANCE hInstance,
 /// <returns>読み込めたらTRUE / 読み込めなかったらFALSE</returns>
 BOOL GameLoad()
 {
+	//タイトル画面の背景を読み込み
+	strcpyDx(titleMovie.path, ".\\Movie\\Diamonds.mp4");
+	titleMovie.handle = LoadGraph(titleMovie.path);
+	if (titleMovie.handle == -1)
+	{
+		MessageBox(
+			GetMainWindowHandle(),	//メインのウィンドウハンドル
+			titleMovie.path,		//メッセージ本文
+			"動画読み込みエラー",	//メッセージタイトル
+			MB_OK					//ボタン
+		);
+	}
+	//動画のハンドル、幅と高さ
+	GetGraphSize(titleMovie.handle, &titleMovie.width, &titleMovie.height);
+	//動画のボリューム
+	titleMovie.Volume = 255;
+	
 	//球の分割数を設定
 	tama_moto.DivYoko = 4;
 	tama_moto.DivTate = 1;
@@ -377,7 +419,6 @@ BOOL GameLoad()
 	//当たり判定の更新
 	collUpdateTama(&tama_moto);
 
-
 	//画像の表示
 	tama_moto.IsDraw = FALSE;
 
@@ -402,8 +443,25 @@ BOOL GameLoad()
 
 	if (LoadImageMem(&back[1], ".\\image\\hosi_rev.png") == FALSE) { return FALSE; }
 	back[1].x = 0;				//画像の左端
-	back[1].y = 0;	//画像の高さ分、位置を上に（ー方向）挙げる
+	back[1].y = 0;	
 	back[1].IsDraw == TRUE;
+
+	//エンド画面の背景
+	if (LoadImageMem(&finish[0], ".\\image\\db.jpg") == FALSE) { return FALSE; }
+	finish[0].x = 0;				//画像の左端
+	finish[0].y = 0;	
+	finish[0].IsDraw == TRUE;
+
+
+	//ロゴの読み込み
+	if (!LoadImageMem(&TitleLogo, ".\\image\\タイトルロゴ.png")) { return FALSE; }
+	if (!LoadImageMem(&EndLogo, ".\\image\\クリアロゴ.png")) { return FALSE; }
+	if (!LoadImageMem(&PlayEnter, ".\\image\\PushEnter.png")) { return FALSE; }
+
+	//音楽の読み込み
+	if (!LoadAudio(&TitleBGM, ".\\Audio\\タイトルBGM.mp3",255,DX_PLAYTYPE_LOOP)) { return FALSE; }
+	if (!LoadAudio(&PlayBGM, ".\\Audio\\プレイBGM.mp3",255,DX_PLAYTYPE_LOOP)) { return FALSE; }
+	if (!LoadAudio(&EndBGM, ".\\Audio\\エンド.mp3",255,DX_PLAYTYPE_LOOP)) { return FALSE; }
 
 	//敵の読み込み
 	for (int i = 0; i < TEKI_KIND; i++)
@@ -504,6 +562,21 @@ VOID GameInit(VOID)
 	back[1].y = 0;
 	back[1].IsDraw = TRUE;
 
+	//タイトルロゴの位置を決める
+	TitleLogo.x = GAME_WIDTH / 2 - TitleLogo.width / 2;		//中央ぞろえ
+	TitleLogo.y = 100;
+	//クリアロゴの位置を決める
+	EndLogo.x = GAME_WIDTH / 2 - EndLogo.width / 2;		//中央ぞろえ
+	EndLogo.y = GAME_HEIGHT / 2 - EndLogo.height / 2;
+
+	//PushEnterの位置を決める
+	PlayEnter.x = GAME_WIDTH / 2 - PlayEnter.width / 2;	//中央ぞろえ	
+	PlayEnter.y = 600;
+
+	//PushEnterの点滅
+	PushEnterCnt = 0;
+	PushEnterBrink = FALSE;
+	
 	//敵の初期化
 	for (int i = 0; i < TEKI_KIND; i++)
 	{
@@ -574,6 +647,9 @@ VOID TitleProc(VOID)
 {
 	if (KeyClick(KEY_INPUT_RETURN) == TRUE)
 	{
+		//BGMを止める
+		StopSoundMem(TitleBGM.handle);
+		
 		GameInit();
 
 		//プレイ画面へ
@@ -584,6 +660,10 @@ VOID TitleProc(VOID)
 
 		return;
 	}
+	if (CheckSoundMem(TitleBGM.handle) == 0)
+	{
+		PlaySoundMem(TitleBGM.handle, TitleBGM.playType);
+	}
 
 	return;
 }
@@ -592,6 +672,53 @@ VOID TitleProc(VOID)
 /// </summary>
 VOID TitleDraw(VOID)
 {
+	//タイトルで動画を背景に描画する
+	//もし動画が再生されていなければ
+	if (GetMovieStateToGraph(titleMovie.handle) == 0)
+	{
+		//再生する
+		SeekMovieToGraph(titleMovie.handle, 0);	//シークバーを戻す
+		PlayMovieToGraph(titleMovie.handle);	//動画を再生（描画はしていない）
+	}
+	//動画を描画
+	DrawExtendGraph(0, 0, GAME_WIDTH, GAME_HEIGHT,titleMovie.handle, TRUE);
+
+	//タイトルロゴ
+	DrawGraph(TitleLogo.x, TitleLogo.y, TitleLogo.handle, TRUE);
+
+	if (PushEnterCnt < PushEnterCntMAX) { PushEnterCnt++; }
+	else
+	{
+		if (PushEnterBrink == TRUE)PushEnterBrink = FALSE;
+		else if (PushEnterBrink == FALSE)PushEnterBrink = TRUE;
+
+		PushEnterCnt = 0;	//カウンタを初期化
+	}
+
+	if (PushEnterBrink == TRUE)
+	{
+		//半透明にする
+		SetDrawBlendMode(DX_BLENDMODE_ALPHA, ((float)PushEnterCnt / PushEnterCntMAX) * 255);
+
+		//PushEnterの描画
+		DrawGraph(PlayEnter.x, PlayEnter.y, PlayEnter.handle, TRUE);
+
+		//半透明終了
+		SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+	}
+
+	if (PushEnterBrink == FALSE)
+	{
+		//半透明にする
+		SetDrawBlendMode(DX_BLENDMODE_ALPHA, ((float)(PushEnterCntMAX - PushEnterCnt) / PushEnterCntMAX) * 255);
+
+		//PushEnterの描画
+		DrawGraph(PlayEnter.x, PlayEnter.y, PlayEnter.handle, TRUE);
+
+		//半透明終了
+		SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+	}
+
 	DrawString(0, 0, "タイトル画面", GetColor(255, 0, 0));
 	return;
 }
@@ -643,8 +770,14 @@ VOID Play(VOID)
 /// </summary>
 VOID PlayProc(VOID)
 {
+	if (CheckSoundMem(PlayBGM.handle) == 0)
+	{
+		PlaySoundMem(PlayBGM.handle, PlayBGM.playType);
+	}
+
 	if (KeyClick(KEY_INPUT_RETURN) == TRUE)
 	{
+		StopSoundMem(PlayBGM.handle);
 
 		ChangeScene(GAME_SCENE_END);
 
@@ -1022,10 +1155,16 @@ VOID EndProc(VOID)
 
 	if (KeyClick(KEY_INPUT_RETURN) == TRUE)
 	{
+		StopSoundMem(EndBGM.handle);
+
 
 		ChangeScene(GAME_SCENE_TITLE);
 
 		return;
+	}
+	if (CheckSoundMem(EndBGM.handle) == 0)
+	{
+		PlaySoundMem(EndBGM.handle, EndBGM.playType);
 	}
 
 	return;
@@ -1035,6 +1174,9 @@ VOID EndProc(VOID)
 /// </summary>
 VOID EndDraw(VOID)
 {
+	DrawGraph(finish[0].x, finish[0].y, finish[0].handle, TRUE);
+
+	DrawGraph(EndLogo.x, EndLogo.y, EndLogo.handle, TRUE);
 	DrawString(0, 0, "エンド画面", GetColor(0, 0, 0));
 	return;
 }
