@@ -162,14 +162,14 @@ AUDIO EndBGM;
 //敵のパスを入れておく
 char tekiPath[TEKI_KIND][255] =
 {
-	{".\\image\\enemy_blue.png"},
-	{".\\image\\enemy_siber.png"},
-	{".\\image\\enemy_green.png"},
-	{".\\image\\enemy_bag.png"},
-	{".\\image\\enemy_purple.png"},
+	{".\\image\\hyhyjuel_blue.png"},
+	{".\\image\\hyhyjuel_siber.png"},
+	{".\\image\\hyjuel_green.png"},
+	{".\\image\\hyhyjuel_bag.png"},
+	{".\\image\\hyjuel_purple.png"},
 	{".\\image\\enemy_red_mini.png"},
-	{".\\image\\enemy_red.png"},
-	{".\\image\\enemy_yelow.png"}
+	{".\\image\\juel_red.png"},
+	{".\\image\\juel_yelow.png"}
 };
 
 //敵が出てくるカウント（間隔）
@@ -399,10 +399,10 @@ BOOL GameLoad()
 	tama_moto.DivTate = 1;
 
 	//球のパスをコピー
-	strcpyDx(tama_moto.path, ".\\image\\dia_green.png");
+	strcpyDx(tama_moto.path, ".\\image\\kumo_tama.png");
 
 	//画像を分割して読み込み
-	if (LoadImageDivMem(&tama_moto.handle[0], ".\\image\\dia_green.png", tama_moto.DivYoko, tama_moto.DivTate) == FALSE) { return FALSE; }
+	if (LoadImageDivMem(&tama_moto.handle[0], ".\\image\\kumo_tama.png", tama_moto.DivYoko, tama_moto.DivTate) == FALSE) { return FALSE; }
 
 	//幅と高さを所得
 	GetGraphSize(tama_moto.handle[0], &tama_moto.width, &tama_moto.height);
@@ -429,27 +429,27 @@ BOOL GameLoad()
 	}
 
 	//プレイヤーの読み込み
-	if (LoadImageMem(&player.img, ".\\image\\player.png") == FALSE) { return FALSE; }
+	if (LoadImageMem(&player.img, ".\\image\\player_kumo.png") == FALSE) { return FALSE; }
 	player.img.x = GAME_WIDTH / 2 - player.img.width;
 	player.img.y = GAME_HEIGHT / 2 - player.img.height;
 	collUpdateplayer(&player);
 	player.img.IsDraw == TRUE;
 
 	//背景の読み込み
-	if (LoadImageMem(&back[0], ".\\image\\hosi.png") == FALSE) { return FALSE; }
+	if (LoadImageMem(&back[0], ".\\image\\yuka1.png") == FALSE) { return FALSE; }
 	back[0].x = 0;				//画像の左端
 	back[0].y = -back[0].height;	//画像の高さ分、位置を上に（ー方向）挙げる
 	back[0].IsDraw == TRUE;
 
-	if (LoadImageMem(&back[1], ".\\image\\hosi_rev.png") == FALSE) { return FALSE; }
+	if (LoadImageMem(&back[1], ".\\image\\yuka2.png") == FALSE) { return FALSE; }
 	back[1].x = 0;				//画像の左端
 	back[1].y = 0;	
 	back[1].IsDraw == TRUE;
 
 	//エンド画面の背景
-	if (LoadImageMem(&finish[0], ".\\image\\db.jpg") == FALSE) { return FALSE; }
-	finish[0].x = 0;				//画像の左端
-	finish[0].y = 0;	
+	if (LoadImageMem(&finish[0], ".\\image\\宝の山.png") == FALSE) { return FALSE; }
+	finish[0].x = GAME_WIDTH - finish[0].width;				//画像の左端
+	finish[0].y = 0;
 	finish[0].IsDraw == TRUE;
 
 
@@ -1117,7 +1117,7 @@ VOID PlayDraw(VOID)
 			if (GAME_DEBUG == TRUE)
 			{
 				DrawBox(tama[i].coll.left, tama[i].coll.top, tama[i].coll.right, tama[i].coll.bottom,
-					GetColor(255, 0, 0), FALSE);
+					GetColor(255, 255, 255), FALSE);
 			}
 		}
 	}
